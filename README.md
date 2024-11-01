@@ -1,2 +1,2 @@
 # Group6TurnoverData
-sten
+sten ja eiko
