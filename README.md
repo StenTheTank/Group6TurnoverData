@@ -1,2 +1,8 @@
 # Group6TurnoverData
-sten ja eiko
+
+**Selgitus:**
+- **Mälu Dockerile**: Vaikimisi määratud mälu Dockerile macOS operatsioonisüsteemis ei pruugi olla piisav. Kui mälu pole piisavalt, võib veebiserver pidevalt taaskäivituda ja see ei tööta stabiilselt. Soovitatav on määrata vähemalt 8GB mälu Docker Engine'ile, et vältida probleeme.
+- **Selleks, et näha palju mälu, käivita see käsk**: Antud käsk kontrollib, kui palju füüsilist mälu on süsteemis saadaval.
+```bash
+docker run --rm "debian:bookworm-slim" bash -c 'numfmt --to iec $(echo $(($(getconf _PHYS_PAGES) * $(getconf PAGE_SIZE))))'
+```
