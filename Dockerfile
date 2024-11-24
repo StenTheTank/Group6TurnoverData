@@ -1,0 +1,1 @@
+FROM --platform=linux/amd64 quay.io/astronomer/astro-runtime:12.4.0
