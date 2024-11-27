@@ -6,6 +6,13 @@
 ```bash
 docker run --rm "debian:bookworm-slim" bash -c 'numfmt --to iec $(echo $(($(getconf _PHYS_PAGES) * $(getconf PAGE_SIZE))))'
 ```
+**Mac**
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+```
+```bash
+brew install astro
+```
 - **Airflow käivitamiseks:**
 ```bash
 astro dev start
