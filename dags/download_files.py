@@ -4,7 +4,7 @@ from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 
 base_url = "https://avaandmed.ariregister.rik.ee/et/avaandmete-allalaadimine"
-save_dir = "~/downloaded_files"
+save_dir = "/Users/salme/Downloads/downloaded_files"
 os.makedirs(save_dir, exist_ok=True)
 
 try:
