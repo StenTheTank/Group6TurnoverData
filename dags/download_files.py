@@ -8,6 +8,7 @@ LOCAL_DUCKDB_CONN_ID = "my_local_duckdb_conn"
 LOCAL_DUCKDB_TABLE_NAME = "duckdb_tables"
 
 @dag(start_date=datetime(2023, 6, 1), schedule=None, catchup=False)
+@task
 def download_files():
     base_url = "https://avaandmed.ariregister.rik.ee/et/avaandmete-allalaadimine"
     save_dir = "/Users/salme/Downloads/downloaded_files"
