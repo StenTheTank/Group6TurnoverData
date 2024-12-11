@@ -96,7 +96,7 @@ def process_file_to_duckdb():
     def create_pandas_df(unzip_result):
         csv_file = unzip_result["csv_file"]
         dir = unzip_result["dir"]
-        emtak_df = pd.read_csv(os.path.join(dir, csv_file))
+        emtak_df = pd.read_csv(os.path.join(dir, csv_file), sep=";")
         return emtak_df
 
     @task
