@@ -13,7 +13,7 @@ DUCKDB_TABLE_NAME = "ducks_garden"
 
 
 @dag(start_date=datetime(2023, 6, 1), schedule=None, catchup=False)
-def duckdb_tutorial_dag_2():
+def save_to_database():
     @task
     def query_duckdb(my_table, conn_id):
         my_duck_hook = DuckDBHook.get_hook(conn_id)
@@ -27,4 +27,4 @@ def duckdb_tutorial_dag_2():
     query_duckdb(my_table=DUCKDB_TABLE_NAME, conn_id=DUCKDB_CONN_ID)
 
 
-duckdb_tutorial_dag_2()
+#save_to_database()

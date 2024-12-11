@@ -1,2 +1,4 @@
 project:
   name: turnover_data
+env:
+  - AIRFLOW__WEBSERVER__BASE_URL=http://localhost:8080

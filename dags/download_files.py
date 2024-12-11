@@ -12,7 +12,6 @@ LOCAL_DUCKDB_CONN_ID = "my_local_duckdb_conn"
 LOCAL_DUCKDB_TABLE_NAME = "duckdb_tables"
 
 @dag(start_date=datetime(2023, 6, 1), schedule=None, catchup=False)
-@task
 def download_files():
     @task
     def downloadfile():
@@ -61,5 +60,5 @@ def download_files():
                 print("Specified header not found on the page.")
         except requests.exceptions.RequestException as e:
             print(f"Error: {e}")
-    downloadfile()
-download_files()
+ #   downloadfile()
+#download_files()

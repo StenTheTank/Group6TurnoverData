@@ -38,6 +38,4 @@ def duckdb_tutorial_dag_1():
             print("quack " * ducks[0])
 
     create_duckdb_table_from_pandas_df(ducks_in_my_garden_df=create_pandas_df())
-
-
-duckdb_tutorial_dag_1()
+#duckdb_tutorial_dag_1()
