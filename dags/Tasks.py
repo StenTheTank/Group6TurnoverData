@@ -110,6 +110,7 @@ def process_file_to_duckdb():
         )
         top5 = conn.execute("SELECT * FROM emtak_myygitulu LIMIT 5").fetchall()
         print("Top 5 records from DuckDB:", top5)
+        conn.close()
 
     # Task Dependencies
     downloadfile()
