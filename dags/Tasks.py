@@ -252,3 +252,42 @@ def tax_and_customs_board_files():
     create_duckdb_table(dataframe)
 
 tax_and_customs_board_files()
+
+#Third DAG - creating combined fact tabel
+@dag(start_date=datetime(2023, 6, 1), schedule=None, catchup=False)
+def create_fact_table():
+    #First task - joining DB tables and creating combined fact table
+    @task
+    def join_tables():
+        conn = duckdb.connect("include/turnover_data.db")
+        conn.execute(
+            """
+            DROP TABLE IF EXISTS faktitabel;
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE faktitabel AS
+            SELECT 
+                m.ReportId,
+                m.EMTAK,
+                m.Jaotatud_myygitulu,
+                y.Registikood,
+                y.Aruandeaasta,
+                y.PeriodEnd,
+                (
+                    SELECT SUM(k.Kaive)
+                    FROM kaive k
+                    WHERE k.Registrikood = y.Registikood 
+                      AND k.Aasta = y.Aruandeaasta
+                    GROUP BY k.Registrikood, k.Aasta
+                    ORDER BY k.Registrikood, k.Aasta
+                ) AS emta_käive
+            FROM myygitulu m
+            JOIN yldandmed y 
+              ON m.ReportId = y.ReportId;
+            """
+        )
+        conn.close()
+    join_tables()
+create_fact_table()
