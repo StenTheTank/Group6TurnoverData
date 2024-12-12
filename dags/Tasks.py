@@ -143,18 +143,54 @@ def tax_and_customs_board_files():
                 file.write(file_response.content)
                 print(f"Saved: {file_path}")
 
+    #Second task - creating combined dataframe from .csv files
     @task
-    def create_pandas_df():
+    def create_pandas_df(downloaded_files):
+        dataframes = []
         partial_name = 'tasutud_maksud'
         matching_csv_files = [file for file in os.listdir(data_lake_dir) if file.endswith(".csv") and partial_name in file]
-        print(f"Matching files for '{partial_name}': {matching_csv_files}")
-        dir = os.path.abspath("dataLake")
+        print(f"Number of matching files: {len(matching_csv_files)}")
+        if not matching_csv_files:
+            print("No matching files found.")
+            return pd.DataFrame()
         for file in matching_csv_files:
+            file_path = os.path.join(data_lake_dir, file)
+            print(f"Reading file: {file_path}")
+            try:
+                with open(file_path, "r", encoding="utf-8", errors="replace") as f:
+                    columns_to_keep = ["Registrikood","Nimi","Kaive"]
+                    df = pd.read_csv(f, sep=";")
+                    df = df[columns_to_keep]
+                    dataframes.append(df)
+            except Exception as e:
+                print(f"Error reading file {file}: {e}")
+        if dataframes:
+            combined_df = pd.concat(dataframes, ignore_index=True)
+            print("Combined DataFrame preview:")
+            print(combined_df.head())
+            return combined_df
+        else:
+            print("No dataframes to combine.")
+            return pd.DataFrame()
 
-            emtak_df = pd.read_csv(os.path.join(dir, file), sep=";")
-        return
+    #Third task - creating a new database table
+    @task
+    def create_duckdb_table(dataframe):
+        conn = duckdb.connect("include/turnover_data.db")
+        conn.register("kaive_view", dataframe)
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS kaive AS
+            SELECT * FROM kaive_view
+            """
+        )
+        top5 = conn.execute("SELECT * FROM kaive LIMIT 5").fetchall()
+        print("Top 5 records from kaive:", top5)
+        conn.close()
 
     #Dependencies
-    download_csv_files()
+    downloaded_files = download_csv_files()
+    dataframe = create_pandas_df(downloaded_files)
+    create_duckdb_table(dataframe)
 
-#tax_and_customs_board_files()
+tax_and_customs_board_files()
