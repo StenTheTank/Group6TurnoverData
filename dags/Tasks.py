@@ -63,59 +63,72 @@ def process_file_to_duckdb():
             print(f"Error: {e}")
 
     @task
-    def unzip_file():
-        partial_name = "EMTAK"
-        # Find the ZIP file matching the partial name
+    def unzip_files():
+        partial_names = ["EMTAK", "yldandmed"]
         os.makedirs(data_lake_dir, exist_ok=True)
-        matching_zip_files = [file for file in os.listdir(data_lake_dir) if file.endswith(".zip") and partial_name in file]
-        print(data_lake_dir)
-        print(matching_zip_files)
 
-        if matching_zip_files:
-            # Select the first matching file (or handle multiple matches)
-            target_zip_name = matching_zip_files[0]
-            target_zip_path = os.path.join(data_lake_dir, target_zip_name)
+        extracted_files = []
+        extract_dir = os.path.join(data_lake_dir, "extracted_files")
+        os.makedirs(extract_dir, exist_ok=True)
+        print(extracted_files)
 
-            # Directory to extract the ZIP file
-            extract_dir = os.path.join(data_lake_dir, "extracted_files")
-            os.makedirs(extract_dir, exist_ok=True)
+        for partial_name in partial_names:
+            # Find ZIP files matching the current partial name
+            matching_zip_files = [file for file in os.listdir(data_lake_dir) if file.endswith(".zip") and partial_name in file]
 
-            # Unzip the specific file
-            with zipfile.ZipFile(target_zip_path, 'r') as zip_ref:
-                zip_ref.extractall(extract_dir)
-                print(f"Extracted {target_zip_name} to {extract_dir}")
+            print(f"Matching files for '{partial_name}': {matching_zip_files}")
 
-            # List extracted files
-            extracted_files = os.listdir(extract_dir)
-            print("Extracted files:", extracted_files)
-            return {"csv_file": extracted_files[0], "dir": extract_dir}
+            for zip_file in matching_zip_files:
+                target_zip_path = os.path.join(data_lake_dir, zip_file)
+                with zipfile.ZipFile(target_zip_path, 'r') as zip_ref:
+                    zip_ref.extractall(extract_dir)
+                    print(f"Extracted {zip_file} to {extract_dir}")
+                extracted_files.append(zip_ref.namelist()[0])
+
+        if extracted_files:
+            print("All extracted files:", extracted_files)
+            return {"Extracted files": extracted_files, "dir": extract_dir}
         else:
-            print(f"No ZIP file containing '{partial_name}' found in {data_lake_dir}.")
+            print(f"No ZIP files containing the specified partial names found in {data_lake_dir}.")
+            return {"Extracted files": extracted_files, "dir": extract_dir}
 
     @task
     def create_pandas_df(unzip_result):
-        csv_file = unzip_result["csv_file"]
+        extracted_files = unzip_result["Extracted files"]
         dir = unzip_result["dir"]
-        emtak_df = pd.read_csv(os.path.join(dir, csv_file), sep=";")
-        return emtak_df
+        emtak_df = pd.read_csv(os.path.join(dir, extracted_files[0]), sep=";")
+        yldandmed_df = pd.read_csv(os.path.join(dir, extracted_files[1]), sep=";")
+        columns_to_keep = ["report_id", "registrikood", "aruandeaast", "period_start", "period_end"]
+        yldandmed_df = yldandmed_df[columns_to_keep]
+        return {"myygitulu": emtak_df, "yldandmed": yldandmed_df}
 
     @task
-    def create_duckdb_table(dataframe):
+    def create_duckdb_table(dataframes):
         conn = duckdb.connect("include/turnover_data.db")
-        conn.sql(
+        conn.register("myygitulu_view", dataframes["myygitulu"])
+        conn.register("yldandmed_view", dataframes["yldandmed"])
+        conn.execute(
             """
-            CREATE TABLE IF NOT EXISTS emtak_myygitulu AS
-            SELECT * FROM dataframe
+            CREATE TABLE IF NOT EXISTS myygitulu AS
+            SELECT * FROM myygitulu_view
             """
         )
-        top5 = conn.execute("SELECT * FROM emtak_myygitulu LIMIT 5").fetchall()
-        print("Top 5 records from DuckDB:", top5)
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS yldandmed AS
+            SELECT * FROM yldandmed_view
+            """
+        )
+        top5 = conn.execute("SELECT * FROM myygitulu LIMIT 5").fetchall()
+        top5_2 = conn.execute("SELECT * FROM yldandmed LIMIT 5").fetchall()
+        print("Top 5 records from myygitulu:", top5)
+        print("Top 5 records from yldandmed:", top5_2)
         conn.close()
 
     # Task Dependencies
     downloadfile()
-    unzip_result = unzip_file()
-    dataframe = create_pandas_df(unzip_result)
-    create_duckdb_table(dataframe)
+    unzip_result = unzip_files()
+    dataframes = create_pandas_df(unzip_result)
+    create_duckdb_table(dataframes)
 
 process_file_to_duckdb()
