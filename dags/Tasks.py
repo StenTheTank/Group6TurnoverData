@@ -7,6 +7,7 @@ from pendulum import datetime
 import duckdb
 import pandas as pd
 import zipfile
+from datetime import datetime
 from duckdb_provider.hooks.duckdb_hook import DuckDBHook
 
 DUCKDB_CONN_ID = "my_local_duckdb_conn"
@@ -78,8 +79,11 @@ def business_register_files():
         extracted_files = unzip_result["Extracted files"]
         dir = unzip_result["dir"]
         emtak_df = pd.read_csv(os.path.join(dir, extracted_files[0]), sep=";")
+        emtak_df = emtak_df.rename(columns={"Jaotatud müügitulu":"jaotatud_myygitulu"})
         yldandmed_df = pd.read_csv(os.path.join(dir, extracted_files[1]), sep=";")
-        columns_to_keep = ["report_id", "registrikood", "aruandeaast", "period_start", "period_end"]
+        columns_to_keep = ["report_id", "registrikood", "aruandeaast", "period_end"]
+        yldandmed_df["registrikood"] = yldandmed_df["registrikood"].astype(str)
+        yldandmed_df["period_end"] = pd.to_datetime(yldandmed_df["period_end"])
         yldandmed_df = yldandmed_df[columns_to_keep]
         return {"myygitulu": emtak_df, "yldandmed": yldandmed_df}
 
@@ -161,6 +165,13 @@ def tax_and_customs_board_files():
                     columns_to_keep = ["Registrikood","Nimi","Kaive"]
                     df = pd.read_csv(f, sep=";")
                     df = df[columns_to_keep]
+                    df["Kaive"] = (
+                        df["Kaive"]
+                        .str.replace(" ", "")
+                        .str.replace(",", ".")
+                        .astype(float)
+                    )
+                    df["failinimi"] = file
                     dataframes.append(df)
             except Exception as e:
                 print(f"Error reading file {file}: {e}")
