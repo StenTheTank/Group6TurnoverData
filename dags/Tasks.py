@@ -7,7 +7,6 @@ from pendulum import datetime
 import duckdb
 import pandas as pd
 import zipfile
-from datetime import datetime
 from duckdb_provider.hooks.duckdb_hook import DuckDBHook
 
 DUCKDB_CONN_ID = "my_local_duckdb_conn"
@@ -82,7 +81,7 @@ def business_register_files():
         emtak_df = emtak_df.rename(columns={"Jaotatud müügitulu":"jaotatud_myygitulu"})
         yldandmed_df = pd.read_csv(os.path.join(dir, extracted_files[1]), sep=";")
         columns_to_keep = ["report_id", "registrikood", "aruandeaast", "period_end"]
-        yldandmed_df["registrikood"] = yldandmed_df["registrikood"].astype(str)
+        yldandmed_df["registrikood"] = yldandmed_df["registrikood"]
         yldandmed_df["period_end"] = pd.to_datetime(yldandmed_df["period_end"])
         yldandmed_df = yldandmed_df[columns_to_keep]
         return {"myygitulu": emtak_df, "yldandmed": yldandmed_df}
@@ -95,14 +94,42 @@ def business_register_files():
         conn.register("yldandmed_view", dataframes["yldandmed"])
         conn.execute(
             """
-            CREATE TABLE IF NOT EXISTS myygitulu AS
-            SELECT * FROM myygitulu_view
+            CREATE TABLE IF NOT EXISTS myygitulu (ReportId VARCHAR,
+                EMTAK VARCHAR,
+                Jaotatud_myygitulu FLOAT,
+                Pohitegevus VARCHAR
+            )
             """
         )
         conn.execute(
             """
-            CREATE TABLE IF NOT EXISTS yldandmed AS
-            SELECT * FROM yldandmed_view
+            INSERT INTO myygitulu
+            SELECT 
+                CAST(report_id AS VARCHAR) AS ReportId,
+                CAST(emtak AS VARCHAR) AS EMTAK,
+                CAST(jaotatud_myygitulu AS FLOAT) AS Jaotatud_myygitulu,
+                CAST(põhitegevusala AS VARCHAR) AS Pohitegevus
+            FROM myygitulu_view
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS yldandmed (ReportId VARCHAR,
+                Registikood VARCHAR,
+                Aruandeaasta INT,
+                PeriodEnd DATE
+            )
+            """
+        )
+        conn.execute(
+            """
+            INSERT INTO yldandmed
+            SELECT 
+                CAST(report_id AS VARCHAR) AS ReportId,
+                CAST(registrikood AS VARCHAR) AS Registikood,
+                CAST(aruandeaast AS INT) AS Aruandeaasta,
+                CAST(period_end AS DATE) AS PeriodEnd
+            FROM yldandmed_view
             """
         )
         top5 = conn.execute("SELECT * FROM myygitulu LIMIT 5").fetchall()
@@ -169,9 +196,10 @@ def tax_and_customs_board_files():
                         df["Kaive"]
                         .str.replace(" ", "")
                         .str.replace(",", ".")
-                        .astype(float)
                     )
-                    df["failinimi"] = file
+                    list = file.split("_")
+                    df["aasta"] = list[2]
+                    df["kvartal"] = list[3]
                     dataframes.append(df)
             except Exception as e:
                 print(f"Error reading file {file}: {e}")
@@ -191,12 +219,31 @@ def tax_and_customs_board_files():
         conn.register("kaive_view", dataframe)
         conn.execute(
             """
-            CREATE TABLE IF NOT EXISTS kaive AS
-            SELECT * FROM kaive_view
+            CREATE TABLE IF NOT EXISTS kaive (Registrikood VARCHAR,
+                Nimi VARCHAR,
+                Kaive FLOAT,
+                Aasta INT,
+                Kvartal VARCHAR
+            )
             """
         )
+        conn.execute(
+            """
+            INSERT INTO kaive
+            SELECT 
+                CAST(Registrikood AS VARCHAR) AS Registrikood,
+                CAST(Nimi AS VARCHAR) AS Nimi,
+                CAST(Kaive AS FLOAT) AS Kaive,
+                CAST(aasta AS INT) AS Aasta,
+                CAST(kvartal AS VARCHAR) AS Kvartal,
+            FROM kaive_view
+            """
+        )
+
         top5 = conn.execute("SELECT * FROM kaive LIMIT 5").fetchall()
+        describe = conn.execute("DESCRIBE kaive").fetchall()
         print("Top 5 records from kaive:", top5)
+        print(describe)
         conn.close()
 
     #Dependencies
