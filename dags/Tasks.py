@@ -143,8 +143,18 @@ def tax_and_customs_board_files():
                 file.write(file_response.content)
                 print(f"Saved: {file_path}")
 
+    @task
+    def create_pandas_df():
+        partial_name = 'tasutud_maksud'
+        matching_csv_files = [file for file in os.listdir(data_lake_dir) if file.endswith(".csv") and partial_name in file]
+        print(f"Matching files for '{partial_name}': {matching_csv_files}")
+        dir = os.path.abspath("dataLake")
+        for file in matching_csv_files:
+
+            emtak_df = pd.read_csv(os.path.join(dir, file), sep=";")
+        return
 
     #Dependencies
     download_csv_files()
 
-tax_and_customs_board_files()
+#tax_and_customs_board_files()
