@@ -281,7 +281,7 @@ def create_fact_and_dim_tables():
         )
         conn.execute(
             """
-            CREATE TABLE IF NOT EXISTS company (Registrikood VARCHAR PRIMARY KEY,
+            CREATE TABLE IF NOT EXISTS company(Registrikood VARCHAR PRIMARY KEY,
                 Nimi VARCHAR,
                 Maakond VARCHAR
             )
@@ -289,17 +289,24 @@ def create_fact_and_dim_tables():
         )
         conn.execute(
             """
-            SELECT DISTINCT k.Registrikood,
-                (SELECT k2.Nimi
-                FROM kaive k2
-                WHERE k2.Registrikood = k.Registrikood LIMIT 1),
+            INSERT INTO company (Registrikood, Nimi, Maakond)
+            SELECT DISTINCT 
+                k.Registrikood,
+                (SELECT k1.Nimi
+                 FROM kaive k1
+                 WHERE k1.Registrikood = k.Registrikood LIMIT 1),
                 (SELECT k2.Maakond
-                FROM kaive k2
-                WHERE k2.Registrikood = k.Registrikood LIMIT 1)
-                FROM kaive k WHERE NOT EXISTS (SELECT 1
-                FROM kaive k1 WHERE k1.Registrikood = k.Registrikood);           
+                 FROM kaive k2
+                 WHERE k2.Registrikood = k.Registrikood LIMIT 1)
+            FROM kaive k
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM company c
+                WHERE c.Registrikood = k.Registrikood);
             """
         )
+        top5 = conn.execute("SELECT * FROM company LIMIT 5").fetchall()
+        print("Top 5 records from company:", top5)
         conn.close()
 
     #Second task - creating dimension table for EMTAK(The Classification of Economic Activities in Estonia)
@@ -316,16 +323,19 @@ def create_fact_and_dim_tables():
         )
         conn.execute(
             """
-            INSERT INTO conversion( 
+            INSERT INTO conversion (emtak, nace)
             SELECT DISTINCT
                 m.emtak,
                 SUBSTRING(m.emtak FROM 1 FOR 4) AS nace
-            FROM myygitulu m WHERE NOT EXISTS (SELECT 1
-            FROM myygitulu m1
-            WHERE m1.emtak = m.emtak)                  
-            )
+            FROM myygitulu m
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM conversion c
+                WHERE c.emtak = m.emtak);
             """
         )
+        top5 = conn.execute("SELECT * FROM conversion LIMIT 5").fetchall()
+        print("Top 5 records from conversion:", top5)
         conn.close()
 
     # Third task - joining DB tables and creating combined fact table
@@ -388,6 +398,6 @@ def create_fact_and_dim_tables():
     #Dependencies
     company_table = create_company_table_dim()
     conversion_table = create_conversion_table_dim(company_table)
-    final_tables = join_tables(conversion_table)
-    remove_raw_tables(final_tables)
+    join_tables(conversion_table)
+    #remove_raw_tables(final_tables)
 create_fact_and_dim_tables()
