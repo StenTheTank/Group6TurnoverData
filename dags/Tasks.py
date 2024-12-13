@@ -296,7 +296,8 @@ def create_fact_and_dim_tables():
                 (SELECT k2.Maakond
                 FROM kaive k2
                 WHERE k2.Registrikood = k.Registrikood LIMIT 1)
-                FROM kaive k            
+                FROM kaive k WHERE NOT EXISTS (SELECT 1
+                FROM kaive k1 WHERE k1.Registrikood = k.Registrikood);           
             """
         )
         conn.close()
@@ -319,13 +320,15 @@ def create_fact_and_dim_tables():
             SELECT DISTINCT
                 m.emtak,
                 SUBSTRING(m.emtak FROM 1 FOR 4) AS nace
-            FROM myygitulu m                   
+            FROM myygitulu m WHERE NOT EXISTS (SELECT 1
+            FROM myygitulu m1
+            WHERE m1.emtak = m.emtak)                  
             )
             """
         )
         conn.close()
 
-        # Third task - joining DB tables and creating combined fact table
+    # Third task - joining DB tables and creating combined fact table
     @task
     def join_tables(conversion_table):
         conn = duckdb.connect("include/turnover_data.db")
@@ -363,9 +366,28 @@ def create_fact_and_dim_tables():
             """
         )
         conn.close()
-
+    #Forth task - removing unnecessary DB tables
+    @task
+    def remove_raw_tables(final_tables):
+        conn = duckdb.connect("include/turnover_data.db")
+        conn.execute(
+            """
+            DROP TABLE IF EXISTS myygitulu;
+            """
+        )
+        conn.execute(
+            """
+            DROP TABLE IF EXISTS yldandmed;
+            """
+        )
+        conn.execute(
+            """
+            DROP TABLE IF EXISTS kaive;
+            """
+        )
     #Dependencies
     company_table = create_company_table_dim()
     conversion_table = create_conversion_table_dim(company_table)
-    join_tables(conversion_table)
+    final_tables = join_tables(conversion_table)
+    remove_raw_tables(final_tables)
 create_fact_and_dim_tables()
