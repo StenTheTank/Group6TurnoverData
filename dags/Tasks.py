@@ -196,7 +196,7 @@ def tax_and_customs_board_files():
             print(f"Reading file: {file_path}")
             try:
                 with open(file_path, "r", encoding="utf-8", errors="replace") as f:
-                    columns_to_keep = ["Registrikood","Nimi","Kaive"]
+                    columns_to_keep = ["Registrikood","Nimi","Kaive","Maakond"]
                     df = pd.read_csv(f, sep=";")
                     df = df[columns_to_keep]
                     #In order to convert string into float, we first need to remove unnecessary spaces
@@ -234,6 +234,7 @@ def tax_and_customs_board_files():
             CREATE TABLE IF NOT EXISTS kaive (Registrikood VARCHAR,
                 Nimi VARCHAR,
                 Kaive FLOAT,
+                Maakond VARCHAR,
                 Aasta INT,
                 Kvartal VARCHAR
             )
@@ -246,6 +247,7 @@ def tax_and_customs_board_files():
                 CAST(Registrikood AS VARCHAR) AS Registrikood,
                 CAST(Nimi AS VARCHAR) AS Nimi,
                 CAST(Kaive AS FLOAT) AS Kaive,
+                CAST(Maakond AS VARCHAR) AS Maakond,
                 CAST(aasta AS INT) AS Aasta,
                 CAST(kvartal AS VARCHAR) AS Kvartal,
             FROM kaive_view
@@ -267,40 +269,103 @@ tax_and_customs_board_files()
 
 #Third DAG - creating combined fact tabel.
 @dag(start_date=datetime(2023, 6, 1), schedule=None, catchup=False)
-def create_fact_table():
-    #First task - joining DB tables and creating combined fact table
+def create_fact_and_dim_tables():
+    #First task - creating dimension table for company
     @task
-    def join_tables():
+    def create_company_table_dim():
+        conn = duckdb.connect("include/turnover_data.db")
+        conn.execute(
+            """
+            CREATE SEQUENCE IF NOT EXISTS id_faktitabel START 1;
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS company (Registrikood VARCHAR PRIMARY KEY,
+                Nimi VARCHAR,
+                Maakond VARCHAR
+            )
+            """
+        )
+        conn.execute(
+            """
+            SELECT DISTINCT k.Registrikood,
+                (SELECT k2.Nimi
+                FROM kaive k2
+                WHERE k2.Registrikood = k.Registrikood LIMIT 1),
+                (SELECT k2.Maakond
+                FROM kaive k2
+                WHERE k2.Registrikood = k.Registrikood LIMIT 1)
+                FROM kaive k            
+            """
+        )
+        conn.close()
+
+    #Second task - creating dimension table for EMTAK(The Classification of Economic Activities in Estonia)
+    #with NACE (NATIONAL CLASSIFICATION OF ECONOMIC ACTIVITIES)
+    @task
+    def create_conversion_table_dim(company_table):
+        conn = duckdb.connect("include/turnover_data.db")
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS conversion (emtak VARCHAR PRIMARY KEY,
+                nace VARCHAR
+            )
+            """
+        )
+        conn.execute(
+            """
+            INSERT INTO conversion( 
+            SELECT DISTINCT
+                m.emtak,
+                SUBSTRING(m.emtak FROM 1 FOR 4) AS nace
+            FROM myygitulu m                   
+            )
+            """
+        )
+        conn.close()
+
+        # Third task - joining DB tables and creating combined fact table
+    @task
+    def join_tables(conversion_table):
         conn = duckdb.connect("include/turnover_data.db")
         # Faktitabel means fact table
         conn.execute(
             """
-            DROP TABLE IF EXISTS faktitabel;
+            CREATE TABLE IF NOT EXISTS faktitabel (
+                ID INTEGER DEFAULT nextval('id_faktitabel') PRIMARY KEY,
+                ReportId VARCHAR,
+                EMTAK VARCHAR,
+                Jaotatud_myygitulu FLOAT,
+                Registikood VARCHAR ,
+                Aruandeaasta INTEGER,
+                PeriodEnd DATE,
+                emta_käive FLOAT
+            )
             """
         )
         conn.execute(
             """
-            CREATE TABLE faktitabel AS
-            SELECT 
-                m.ReportId,
-                m.EMTAK,
-                m.Jaotatud_myygitulu,
-                y.Registikood,
-                y.Aruandeaasta,
-                y.PeriodEnd,
-                (
-                    SELECT SUM(k.Kaive)
+            INSERT INTO faktitabel (ReportId, EMTAK, Jaotatud_myygitulu, Registikood, Aruandeaasta, PeriodEnd, emta_käive)
+            SELECT m.ReportId,
+                   m.EMTAK,
+                   m.Jaotatud_myygitulu,
+                   y.Registikood,
+                   y.Aruandeaasta,
+                   y.PeriodEnd,
+                   (SELECT SUM(k.Kaive)
                     FROM kaive k
-                    WHERE k.Registrikood = y.Registikood 
-                      AND k.Aasta = y.Aruandeaasta
-                    GROUP BY k.Registrikood, k.Aasta
-                    ORDER BY k.Registrikood, k.Aasta
-                ) AS emta_käive
+                    WHERE k.Registrikood = y.Registikood
+                    AND y.Aruandeaasta = k.Aasta
+                    GROUP BY k.Registrikood, k.Aasta) as emta_käive
             FROM myygitulu m
-            JOIN yldandmed y 
-              ON m.ReportId = y.ReportId;
+            JOIN yldandmed y ON m.ReportId = y.ReportId;
             """
         )
         conn.close()
-    join_tables()
-create_fact_table()
+
+    #Dependencies
+    company_table = create_company_table_dim()
+    conversion_table = create_conversion_table_dim(company_table)
+    join_tables(conversion_table)
+create_fact_and_dim_tables()
