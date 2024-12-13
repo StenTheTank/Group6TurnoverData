@@ -395,9 +395,30 @@ def create_fact_and_dim_tables():
             DROP TABLE IF EXISTS kaive;
             """
         )
+
+    @task
+    def remove_duplicate_rows(final_tables):
+        conn = duckdb.connect("include/turnover_data.db")
+        conn.execute(
+            """
+            DELETE FROM faktitabel
+                WHERE ID IN (
+                    SELECT ID
+                    FROM (
+                        SELECT
+                            ID,
+                            ROW_NUMBER() OVER (PARTITION BY ReportId, EMTAK, Jaotatud_myygitulu, Registikood, Aruandeaasta, PeriodEnd, emta_käive ORDER BY ID) AS row_num
+                        FROM
+                            faktitabel
+                    ) AS subquery
+                    WHERE row_num > 1
+                )
+            """
+        )
     #Dependencies
     company_table = create_company_table_dim()
     conversion_table = create_conversion_table_dim(company_table)
-    join_tables(conversion_table)
-    #remove_raw_tables(final_tables)
+    final_tables = join_tables(conversion_table)
+    remove_raw_tables(final_tables)
+    remove_duplicate_rows(final_tables)
 create_fact_and_dim_tables()
