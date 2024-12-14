@@ -7,6 +7,7 @@
 - dataGrip
 
 We are using as data sources open data two tables from Estonian Business Register and quarterly data tables from Estonian Tax and Customs Board.
+The idea of the project was to create dataset of emtak based company turnovers that would alow to make business plan competition analyze queries. Problem is that official Business Register and in the market data coles as Äripäev, InfoRegister and Teatmik.ee are using same query ideology that queries are made by searching company name or reg code. Therefore original data was structured in a way that queries by econimic activity field (emtak/nace code) failed to produce usable answers - data was aggregated only by field of main activity. We solved problem creating fact table where fact is company turnover with certain economic activity (represented by emtak classificator code) and for each activity we created new row which alowed simple and fast aggregation of business area turnover data.
 
 **How to get started:**
 - **Memory for Docker**: The default memory allocated to Docker on macOS may not be sufficient. If there isn't enough memory, the web server may continuously restart and won't operate stably. It is recommended to allocate at least 8GB of memory to Docker Engine to avoid issues.
