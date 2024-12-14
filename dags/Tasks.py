@@ -13,9 +13,9 @@ from duckdb_provider.hooks.duckdb_hook import DuckDBHook
 data_lake_dir = os.path.abspath("dataLake")
 
 #First DAG - downloading and processing files from Business register.
-#The DAG is scheduled at 00:00 on the first day of every third month.
+#The DAG is scheduled at 00:00 on the eleventh day of every third month.
 #There is no need to run it more often, as the data in the source is not updated frequently.
-@dag(start_date=datetime(2024, 12, 13), schedule="0 0 1 */3 *", catchup=False)
+@dag(start_date=datetime(2024, 12, 13), schedule="0 0 11 */3 *", catchup=False)
 def business_register_files():
     #First task - downloading .zip files
     @task
@@ -155,9 +155,9 @@ def business_register_files():
 business_register_files()
 
 #Second DAG - downloading and processing files from tax and customs board
-#The DAG is scheduled at 00:00 on the first day of every third month.
+#The DAG is scheduled at 00:00 on the eleventh day of every third month.
 #There is no need to run it more often, as the data in the source is not updated frequently.
-@dag(start_date=datetime(2024, 12, 13), schedule="0 0 1 */3 *", catchup=False)
+@dag(start_date=datetime(2024, 12, 13), schedule="0 0 11 */3 *", catchup=False)
 def tax_and_customs_board_files():
     #First task - downloading .csv files from another source.
     @task
@@ -272,11 +272,11 @@ def tax_and_customs_board_files():
 tax_and_customs_board_files()
 
 #Third DAG - creating combined fact and dimension tabels.
-#The DAG is scheduled at 01:00 on the first day of every third month.
+#The DAG is scheduled at 01:00 on the eleventh day of every third month.
 #One hour later than the previous ones; in order to ensure that all the necessary files have been downloaded
 #before running the DAG.
 #There is no need to run it more often, as the data in the source is not updated frequently.
-@dag(start_date=datetime(2024, 12, 13), schedule="0 1 1 */3 *", catchup=False)
+@dag(start_date=datetime(2024, 12, 13), schedule="0 1 11 */3 *", catchup=False)
 def create_fact_and_dim_tables():
     #First task - creating dimension table for company
     @task

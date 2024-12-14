@@ -6,7 +6,15 @@
 - duckDB
 - dataGrip
 
-We are using as data sources open data two tables from Estonian Business Register and quarterly data tables from Estonian Tax and Customs Board.
+We are using as data sources open data two tables from Estonian Business Register and quarterly data tables from 
+Estonian Tax and Customs Board.
+The idea of the project was to create dataset of emtak based company turnovers that would allow to make business 
+plan competition analyze queries. Problem is that official Business Register and in the market data coles as Äripäev, 
+InfoRegister and Teatmik.ee are using same query ideology that queries are made by searching company name or reg code.
+Therefor original data was structured in a way that queries by economic activity field (emtak/nace code) failed to 
+produce usable answers - data was aggregated only by field of main activity. We solved problem by creating fact table 
+where fact is company turnover with certain economic activity (represented by emtak classificator code) and for 
+each activity we created new row which allows simple and fast aggregation of business area turnover data.
 
 **How to get started:**
 - **Memory for Docker**: The default memory allocated to Docker on macOS may not be sufficient. If there isn't enough memory, the web server may continuously restart and won't operate stably. It is recommended to allocate at least 8GB of memory to Docker Engine to avoid issues.
@@ -51,14 +59,17 @@ The command should have started airflow in a docker container you can access it 
 - The end result is a duckDB database in the include folder
 - You can access it with any database tool like dBeaver.
 - For answering the business questions three sql queries were created. We used dataGrip to run the following queries:
-For creating business sector turnover trend data for business sector defined by emtak code given by consultat. Answer is sector turnovers for years 2019 - 2023. To get how total turnover of software development companies is behaving use emtak=62011, for webhosting and dataprocessing business use emtak=63111. codes are given in EMTAK2008 webpage.
+For creating business sector turnover trend data for business sector defined by emtak code given by consultant. 
+Answer is sector turnovers for years 2019 - 2023. To get how total turnover of software development companies is 
+behaving use emtak=62011, for web hosting and data processing business use emtak=63111. codes are given in EMTAK2008 
+webpage.
 ```sql 
 SELECT f.EMTAK, f.Aruandeaasta, SUM(f.Jaotatud_myygitulu)
 FROM faktitabel f
 GROUP BY f.Aruandeaasta, f.EMTAK
 ORDER BY EMTAK, Aruandeaasta
 ```
-For crreating list of TOP10 companies by turnovers in business sector defined by emtak.
+For creating list of TOP10 companies by turnovers in business sector defined by emtak.
 ```sql 
 SELECT f.Registikood, c.Nimi, f.Jaotatud_myygitulu, f.Aruandeaasta AS aasta
 FROM faktitabel f
@@ -66,7 +77,12 @@ FROM faktitabel f
 WHERE Aruandeaasta = ?
 ORDER BY Jaotatud_myygitulu DESC LIMIT 10
 ```
-For creating conversion coefficient to compare annual report turnovers with tax autohority turnovers as turnover creation metodology is different. Tax autohority turnover data is refresed quarterly 10-days after end of quarter, but annual report turnover data is refreshed yearly with 6-months publication delay. Therefore there is interest to get more up to date data, but as methodologies differ then it is hard to compare datas. Our solution is precalculated coeficient based on last two annual reports (currently 2022-2023 data). This coeficient also hints how much company turnover is related with buying goods from other EU countries.
+For creating conversion coefficient to compare annual report turnovers with tax authority turnovers as turnover 
+creation methodology is different. Tax authority turnover data is refreshed quarterly 10-days after end of quarter, 
+but annual report turnover data is refreshed yearly with 6-months publication delay. Therefor there is interest to 
+get more up-to-date data, but as methodologies differ then it is hard to compare datas. 
+Our solution is precalculated coefficient based on last two annual reports (currently 2022-2023 data). 
+This coefficient also hints how much company turnover is related with buying goods from other EU countries.
 ```sql 
 SELECT c.Nimi, c.Registrikood, SUM(emta_käive) / SUM(Jaotatud_myygitulu) as konversioonikoefitsent
 FROM faktitabel f
