@@ -1,4 +1,10 @@
 # Group6TurnoverData
+**Tools used in this project**
+- docker
+- astro cli
+- apache airflow
+- duckDB
+- dataGrip
 
 **How to get started:**
 - **Memory for Docker**: The default memory allocated to Docker on macOS may not be sufficient. If there isn't enough memory, the web server may continuously restart and won't operate stably. It is recommended to allocate at least 8GB of memory to Docker Engine to avoid issues.
@@ -30,3 +36,35 @@ The command should have started airflow in a docker container you can access it 
 - Connection Id: my_local_duckdb_conn
 - connection type: DuckDB
 - save
+
+
+**Running DAGs**
+- Ask Salme to run the DAG for you
+
+**Result**
+
+- The end result is a duckDB database in the include folder
+- You can access it with any database tool like dBeaver. We used dataGrip to run the following queries:
+```sql
+SELECT f.EMTAK, f.Aruandeaasta, SUM(f.Jaotatud_myygitulu)
+FROM faktitabel f
+GROUP BY f.Aruandeaasta, f.EMTAK
+ORDER BY EMTAK, Aruandeaasta
+```
+```sql
+SELECT f.Registikood, c.Nimi, f.Jaotatud_myygitulu, f.Aruandeaasta AS aasta
+FROM faktitabel f
+         JOIN company c on f.Registikood = c.Registrikood
+WHERE Aruandeaasta = ?
+ORDER BY Jaotatud_myygitulu DESC LIMIT 10
+```
+
+```sql
+SELECT c.Nimi, c.Registrikood, SUM(emta_käive) / SUM(Jaotatud_myygitulu) as konversioonikoefitsent
+FROM faktitabel f
+         join company c on c.Registrikood = f.Registikood
+WHERE f.Aruandeaasta IN (2022, 2023)
+  AND c.Registrikood = ?
+GROUP BY c.Nimi, c.Registrikood
+ORDER BY c.Nimi, c.Registrikood
+```
