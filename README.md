@@ -6,6 +6,8 @@
 - duckDB
 - dataGrip
 
+We are using as data sources open data two tables from Estonian Business Register and quarterly data tables from Estonian Tax and Customs Board.
+
 **How to get started:**
 - **Memory for Docker**: The default memory allocated to Docker on macOS may not be sufficient. If there isn't enough memory, the web server may continuously restart and won't operate stably. It is recommended to allocate at least 8GB of memory to Docker Engine to avoid issues.
 - **To see how much memory is available, run this command**: This command checks how much physical memory is available on the system.
@@ -47,14 +49,15 @@ The command should have started airflow in a docker container you can access it 
 **Result**
 
 - The end result is a duckDB database in the include folder
-- You can access it with any database tool like dBeaver. We used dataGrip to run the following queries:
-```sql
+- You can access it with any database tool like dBeaver.
+- For answering the business questions three sql queries were created. We used dataGrip to run the following queries:
+```sql for creating business sector turnover trend data for business sector defined by emtak code given by consultat. Answer is sector turnovers for years 2019 - 2023. To get how total turnover of software development companies is behaving use emtak=62011, for webhosting and dataprocessing business use emtak=63111. codes are given in EMTAK2008 webpage.
 SELECT f.EMTAK, f.Aruandeaasta, SUM(f.Jaotatud_myygitulu)
 FROM faktitabel f
 GROUP BY f.Aruandeaasta, f.EMTAK
 ORDER BY EMTAK, Aruandeaasta
 ```
-```sql
+```sql for crreating list of TOP10 companies by turnovers in business sector defined by emtak.
 SELECT f.Registikood, c.Nimi, f.Jaotatud_myygitulu, f.Aruandeaasta AS aasta
 FROM faktitabel f
          JOIN company c on f.Registikood = c.Registrikood
@@ -62,7 +65,7 @@ WHERE Aruandeaasta = ?
 ORDER BY Jaotatud_myygitulu DESC LIMIT 10
 ```
 
-```sql
+```sql for creating conversion coefficient to compare annual report turnovers with tax autohority turnovers as turnover creation metodology is different. Tax autohority turnover data is refresed quarterly 10-days after end of quarter, but annual report turnover data is refreshed yearly with 6-months publication delay. Therefore there is interest to get more up to date data, but as methodologies differ then it is hard to compare datas. Our solution is precalculated coeficient based on last two annual reports (currently 2022-2023 data). This coeficient also hints how much company turnover is related with buying goods from other EU countries.
 SELECT c.Nimi, c.Registrikood, SUM(emta_käive) / SUM(Jaotatud_myygitulu) as konversioonikoefitsent
 FROM faktitabel f
          join company c on c.Registrikood = f.Registikood
