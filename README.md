@@ -37,9 +37,12 @@ The command should have started airflow in a docker container you can access it 
 - connection type: DuckDB
 - save
 
-
 **Running DAGs**
-- Ask Salme to run the DAG for you
+- DAGs are scheduled to run on the first day of every third month. However, the DAGs can be run from Airflow UI 
+- manually here: http://localhost:8080
+- Select ‘DAGs’ from the menu at the top.
+- You can run the following two DAGs in parallel: "business_register_files" and "tax_and_customs_board_files"
+- Don't run the third DAG "create_fact_and_dim_tables" before the first two DAGs are finished.
 
 **Result**
 
