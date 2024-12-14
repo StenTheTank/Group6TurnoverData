@@ -12,8 +12,10 @@ from duckdb_provider.hooks.duckdb_hook import DuckDBHook
 #The path to the data lake where raw downloaded files are stored
 data_lake_dir = os.path.abspath("dataLake")
 
-#First DAG - downloading and processing files from Business register
-@dag(start_date=datetime(2023, 6, 1), schedule=None, catchup=False)
+#First DAG - downloading and processing files from Business register.
+#The DAG is scheduled at 00:00 on the first day of every third month.
+#There is no need to run it more often, as the data in the source is not updated frequently.
+@dag(start_date=datetime(2024, 12, 13), schedule="0 0 1 */3 *", catchup=False)
 def business_register_files():
     #First task - downloading .zip files
     @task
@@ -48,7 +50,7 @@ def business_register_files():
             print(f"Error: {e}")
 
     #Second task - unzip specific files. From the downloaded files, we need only two. Here we unzip
-    # the files and save them to a separate folder in the data lake.
+    #the files and save them to a separate folder in the data lake.
     @task
     def unzip_files(download_files):
         partial_names = ["EMTAK", "yldandmed"]
@@ -74,7 +76,7 @@ def business_register_files():
             return {"Extracted files": extracted_files, "dir": extract_dir}
 
     #Third task - converting .csv files to Pandas dataframe. Here we are converting .csv files
-    # to Pandas dataframe, including only necessary columns.
+    #to Pandas dataframe, including only necessary columns.
     @task
     def create_pandas_df(unzip_result):
         extracted_files = unzip_result["Extracted files"]
@@ -153,7 +155,9 @@ def business_register_files():
 business_register_files()
 
 #Second DAG - downloading and processing files from tax and customs board
-@dag(start_date=datetime(2023, 6, 1), schedule=None, catchup=False)
+#The DAG is scheduled at 00:00 on the first day of every third month.
+#There is no need to run it more often, as the data in the source is not updated frequently.
+@dag(start_date=datetime(2024, 12, 13), schedule="0 0 1 */3 *", catchup=False)
 def tax_and_customs_board_files():
     #First task - downloading .csv files from another source.
     @task
@@ -180,7 +184,7 @@ def tax_and_customs_board_files():
                 file.write(file_response.content)
                 print(f"Saved: {file_path}")
 
-    #Second task - creating combined dataframe from .csv files. We downloaded 16 .csv files, and
+    #Second task - creating combined dataframe from .csv files. We downloaded .csv files, and
     #here we combine them into a single dataframe, keeping only necessary columns.
     @task
     def create_pandas_df(downloaded_files):
@@ -267,8 +271,12 @@ def tax_and_customs_board_files():
 
 tax_and_customs_board_files()
 
-#Third DAG - creating combined fact tabel.
-@dag(start_date=datetime(2023, 6, 1), schedule=None, catchup=False)
+#Third DAG - creating combined fact and dimension tabels.
+#The DAG is scheduled at 01:00 on the first day of every third month.
+#One hour later than the previous ones; in order to ensure that all the necessary files have been downloaded
+#before running the DAG.
+#There is no need to run it more often, as the data in the source is not updated frequently.
+@dag(start_date=datetime(2024, 12, 13), schedule="0 1 1 */3 *", catchup=False)
 def create_fact_and_dim_tables():
     #First task - creating dimension table for company
     @task
@@ -376,26 +384,8 @@ def create_fact_and_dim_tables():
             """
         )
         conn.close()
-    #Forth task - removing unnecessary DB tables
-    @task
-    def remove_raw_tables(final_tables):
-        conn = duckdb.connect("include/turnover_data.db")
-        conn.execute(
-            """
-            DROP TABLE IF EXISTS myygitulu;
-            """
-        )
-        conn.execute(
-            """
-            DROP TABLE IF EXISTS yldandmed;
-            """
-        )
-        conn.execute(
-            """
-            DROP TABLE IF EXISTS kaive;
-            """
-        )
 
+    # Forth task - removing duplicate lines from the fact table
     @task
     def remove_duplicate_rows(final_tables):
         conn = duckdb.connect("include/turnover_data.db")
@@ -415,10 +405,33 @@ def create_fact_and_dim_tables():
                 )
             """
         )
+
+    #Fifth task - removing unnecessary DB tables
+    @task
+    def remove_raw_tables(remove_duplicates):
+        conn = duckdb.connect("include/turnover_data.db")
+        conn.execute(
+            """
+            DROP TABLE IF EXISTS myygitulu;
+            """
+        )
+        conn.execute(
+            """
+            DROP TABLE IF EXISTS yldandmed;
+            """
+        )
+        conn.execute(
+            """
+            DROP TABLE IF EXISTS kaive;
+            """
+        )
+
     #Dependencies
+    #The reason of using parameters that are not actually used by the functions, is the same as previously -
+    #we want to run the tasks sequentially.
     company_table = create_company_table_dim()
     conversion_table = create_conversion_table_dim(company_table)
     final_tables = join_tables(conversion_table)
-    remove_raw_tables(final_tables)
-    remove_duplicate_rows(final_tables)
+    remove_duplicates = remove_duplicate_rows(final_tables)
+    remove_raw_tables(remove_duplicates)
 create_fact_and_dim_tables()
